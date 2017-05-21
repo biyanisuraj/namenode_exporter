@@ -4,7 +4,11 @@
 *.so
 
 # Builds
-namenode_exporter
+/namenode_exporter
+/.build
+/.deps
+/.release
+/.tarballs
 
 # Folders
 _obj
@@ -48,4 +52,3 @@ Icon
 # OS X Files that might appear on external disk
 .Spotlight-V100
 .Trashes
-

@@ -1,0 +1,51 @@
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Builds
+namenode_exporter
+
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+dependencies-stamp
+/node_exporter
+/.build
+/.deps
+/.release
+/.tarballs
+
+# Intellij
+/.idea
+*.iml
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must ends with two \r.
+Icon
+
+# Thumbnails
+._*
+
+# OS X Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+

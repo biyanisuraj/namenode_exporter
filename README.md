@@ -42,6 +42,7 @@ To see all available configuration flags:
 ```
 
 * __`namenode.jmx.url`:__ Namenode JMX URL. (default "http://localhost:50070/jmx")
+* __`namenode.jmx.timeout`:__ Timeout reading from namenode JMX url. (default 5s)
 * __`namenode.pid-file`:__ Optional path to a file containing the namenode PID for additional metrics.
 * __`web.listen-address`:__ Address to listen on for web interface and telemetry. (default ":9779")
 * __`web.telemetry-path`:__ Path under which to expose metrics. (default "/metrics")

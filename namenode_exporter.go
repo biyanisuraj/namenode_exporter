@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -16,11 +17,12 @@ import (
 )
 
 var (
-	namenodeJmxURL = flag.String("namenode.jmx.url", "http://localhost:50070/jmx", "Namenode JMX URL.")
-	pidFile        = flag.String("namenode.pid-file", "", "Optional path to a file containing the namenode PID for additional metrics.")
-	showVersion    = flag.Bool("version", false, "Print version information.")
-	listenAddress  = flag.String("web.listen-address", ":9779", "Address to listen on for web interface and telemetry.")
-	metricsPath    = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	namenodeJmxURL     = flag.String("namenode.jmx.url", "http://localhost:50070/jmx", "Namenode JMX URL.")
+	namenodeJmxTimeout = flag.Duration("namenode.jmx.timeout", 5*time.Second, "Timeout reading from namenode JMX URL.")
+	pidFile            = flag.String("namenode.pid-file", "", "Optional path to a file containing the namenode PID for additional metrics.")
+	showVersion        = flag.Bool("version", false, "Print version information.")
+	listenAddress      = flag.String("web.listen-address", ":9779", "Address to listen on for web interface and telemetry.")
+	metricsPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 )
 
 const (
@@ -39,7 +41,8 @@ var landingPage = []byte(`<html>
 
 // Exporter collects metrics from a namenode server.
 type Exporter struct {
-	url string
+	url        string
+	httpClient *http.Client
 
 	// namenode server health metrics
 	up            *prometheus.Desc // DONE!!! gauge -> validated by connecting the the JMX endpoint
@@ -89,9 +92,11 @@ type Exporter struct {
 }
 
 // NewExporter returns an initialized exporter.
-func NewExporter(url string) *Exporter {
+func NewExporter(url string, timeout time.Duration) *Exporter {
 	return &Exporter{
-		url: url,
+		url:        url,
+		httpClient: &http.Client{Timeout: timeout},
+
 		// namenode server health metrics
 		up: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "up"),
@@ -383,13 +388,16 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches the statistics from the configured Namenode server, and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	resp, err := http.Get(e.url)
+	resp, err := e.httpClient.Get(e.url)
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(e.up, prometheus.GaugeValue, 0)
 		log.Errorf("Failed to collect metrics from namenode: %s", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		ioutil.ReadAll(resp.Body) // Mindless drain body upon exit
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		ch <- prometheus.MustNewConstMetric(e.up, prometheus.GaugeValue, 0)
@@ -495,7 +503,7 @@ func main() {
 	log.Infoln("Starting namenode_exporter", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 
-	prometheus.MustRegister(NewExporter(*namenodeJmxURL))
+	prometheus.MustRegister(NewExporter(*namenodeJmxURL, *namenodeJmxTimeout))
 
 	if *pidFile != "" {
 		procExporter := prometheus.NewProcessCollectorPIDFn(

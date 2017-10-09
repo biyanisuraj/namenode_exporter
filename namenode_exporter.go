@@ -29,16 +29,6 @@ const (
 	namespace = "namenode"
 )
 
-// landingPage contains the HTML served at '/'.
-var landingPage = []byte(`<html>
-<head><title>Namenode Exporter</title></head>
-<body>
-<h1>Namenode Exporter</h1>
-<p><a href='` + *metricsPath + `'>Metrics</a></p>
-</body>
-</html>
-`)
-
 // Exporter collects metrics from a namenode server.
 type Exporter struct {
 	url        string
@@ -385,6 +375,21 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.jvmThreadsTerminated
 }
 
+type jmxEnvelope struct {
+	Beans []jmxBean `json:"beans"`
+}
+
+type jmxBean map[string]interface{}
+
+func mustNewConstBoolMetric(desc *prometheus.Desc, valueType prometheus.ValueType, value bool, labelValues ...string) prometheus.Metric {
+	var fval float64
+	if value {
+		fval = 1
+	}
+
+	return prometheus.MustNewConstMetric(desc, valueType, fval, labelValues...)
+}
+
 // Collect fetches the statistics from the configured Namenode server, and
 // delivers them as Prometheus metrics. It implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
@@ -405,15 +410,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		ch <- prometheus.MustNewConstMetric(e.up, prometheus.GaugeValue, 0)
-		log.Errorf("Failed to collect metrics from namenode: %s", err)
-		return
-	}
-
-	var f interface{}
-	err = json.Unmarshal(data, &f)
+	var envelope jmxEnvelope
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&envelope)
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(e.up, prometheus.GaugeValue, 0)
 		log.Errorf("Failed to collect metrics from namenode: %s", err)
@@ -421,16 +420,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 	ch <- prometheus.MustNewConstMetric(e.up, prometheus.GaugeValue, 1)
 
-	m := f.(map[string]interface{})
-	var nameList = m["beans"].([]interface{})
-	for _, nameData := range nameList {
-		nameDataMap := nameData.(map[string]interface{})
-
-		if nameDataMap["name"] == "java.lang:type=Runtime" {
+	for _, nameDataMap := range envelope.Beans {
+		switch nameDataMap["name"] {
+		case "java.lang:type=Runtime":
 			ch <- prometheus.MustNewConstMetric(e.uptime, prometheus.GaugeValue, nameDataMap["Uptime"].(float64))
-		}
-
-		if nameDataMap["name"] == "Hadoop:service=NameNode,name=FSNamesystem" {
+		case "Hadoop:service=NameNode,name=FSNamesystem":
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksTotal, prometheus.GaugeValue, nameDataMap["BlocksTotal"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksUnderReplicated, prometheus.GaugeValue, nameDataMap["UnderReplicatedBlocks"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksPendingReplication, prometheus.GaugeValue, nameDataMap["PendingReplicationBlocks"].(float64))
@@ -440,40 +434,22 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksMissing, prometheus.GaugeValue, nameDataMap["MissingBlocks"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksCorrupt, prometheus.GaugeValue, nameDataMap["CorruptBlocks"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksExcess, prometheus.GaugeValue, nameDataMap["ExcessBlocks"].(float64))
-		}
-
-		if nameDataMap["name"] == "Hadoop:service=NameNode,name=FSNamesystemState" {
-			switch nameDataMap["FSState"] {
-			case "Operational":
-				ch <- prometheus.MustNewConstMetric(e.fsOperational, prometheus.GaugeValue, 1)
-			default:
-				ch <- prometheus.MustNewConstMetric(e.fsOperational, prometheus.GaugeValue, 0)
-			}
-
+		case "Hadoop:service=NameNode,name=FSNamesystemState":
+			ch <- mustNewConstBoolMetric(e.fsOperational, prometheus.GaugeValue, nameDataMap["FSState"] == "Operational")
 			ch <- prometheus.MustNewConstMetric(e.dataNodesLive, prometheus.GaugeValue, nameDataMap["NumLiveDataNodes"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dataNodesDead, prometheus.GaugeValue, nameDataMap["NumDeadDataNodes"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsFilesTotal, prometheus.GaugeValue, nameDataMap["FilesTotal"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsCapacityBytesTotal, prometheus.GaugeValue, nameDataMap["CapacityTotal"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsCapacityBytesUsed, prometheus.GaugeValue, nameDataMap["CapacityUsed"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsCapacityBytesRemaining, prometheus.GaugeValue, nameDataMap["CapacityRemaining"].(float64))
-		}
-
-		if nameDataMap["name"] == "Hadoop:service=NameNode,name=NameNodeInfo" {
-			switch nameDataMap["Safemode"] {
-			case "": //safemode is off
-				ch <- prometheus.MustNewConstMetric(e.safemodeOn, prometheus.GaugeValue, 0)
-			default: //should be a string like: Safe mode is ON.
-				ch <- prometheus.MustNewConstMetric(e.safemodeOn, prometheus.GaugeValue, 1)
-			}
-
+		case "Hadoop:service=NameNode,name=NameNodeInfo":
+			ch <- mustNewConstBoolMetric(e.safemodeOn, prometheus.GaugeValue, nameDataMap["Safemode"] != "")
 			ch <- prometheus.MustNewConstMetric(e.dfsPercentUsed, prometheus.GaugeValue, nameDataMap["PercentUsed"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsPercentRemaining, prometheus.GaugeValue, nameDataMap["PercentRemaining"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsNonDfsBytesUsed, prometheus.GaugeValue, nameDataMap["NonDfsUsedSpace"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlockPoolBytesUsed, prometheus.GaugeValue, nameDataMap["BlockPoolUsedSpace"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlockPoolPercentUsed, prometheus.GaugeValue, nameDataMap["PercentBlockPoolUsed"].(float64))
-		}
-
-		if nameDataMap["name"] == "Hadoop:service=NameNode,name=JvmMetrics" {
+		case "Hadoop:service=NameNode,name=JvmMetrics":
 			ch <- prometheus.MustNewConstMetric(e.jvmLogFatal, prometheus.CounterValue, nameDataMap["LogFatal"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.jvmLogError, prometheus.CounterValue, nameDataMap["LogError"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.jvmLogWarn, prometheus.CounterValue, nameDataMap["LogWarn"].(float64))
@@ -506,20 +482,28 @@ func main() {
 	prometheus.MustRegister(NewExporter(*namenodeJmxURL, *namenodeJmxTimeout))
 
 	if *pidFile != "" {
-		procExporter := prometheus.NewProcessCollectorPIDFn(
-			func() (int, error) {
-				content, err := ioutil.ReadFile(*pidFile)
-				if err != nil {
-					return 0, fmt.Errorf("Can't read pid file %q: %s", *pidFile, err)
-				}
-				value, err := strconv.Atoi(strings.TrimSpace(string(content)))
-				if err != nil {
-					return 0, fmt.Errorf("Can't parse pid file %q: %s", *pidFile, err)
-				}
-				return value, nil
-			}, namespace)
+		procExporter := prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+			content, err := ioutil.ReadFile(*pidFile)
+			if err != nil {
+				return 0, fmt.Errorf("can't read pid file %q: %s", *pidFile, err)
+			}
+			value, err := strconv.Atoi(strings.TrimSpace(string(content)))
+			if err != nil {
+				return 0, fmt.Errorf("can't parse pid file %q: %s", *pidFile, err)
+			}
+			return value, nil
+		}, namespace)
 		prometheus.MustRegister(procExporter)
 	}
+
+	landingPage := []byte(`<html>
+<head><title>Namenode Exporter</title></head>
+<body>
+<h1>Namenode Exporter</h1>
+<p><a href='` + *metricsPath + `'>Metrics</a></p>
+</body>
+</html>
+`)
 
 	http.Handle(*metricsPath, prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

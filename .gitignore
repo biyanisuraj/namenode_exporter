@@ -28,11 +28,6 @@ _testmain.go
 
 *.exe
 dependencies-stamp
-/node_exporter
-/.build
-/.deps
-/.release
-/.tarballs
 
 # Intellij
 /.idea

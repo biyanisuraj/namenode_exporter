@@ -2,8 +2,17 @@ sudo: false
 
 language: go
 go:
-- 1.8
-- tip
+  - 1.8
 
 script:
-- make
+  - make cover vet
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+branches:
+  only:
+    - master
+
+notifications:
+  email: false

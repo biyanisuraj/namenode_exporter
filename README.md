@@ -1,9 +1,14 @@
-# namenode_exporter [![Build Status](https://travis-ci.org/fahlke/namenode_exporter.svg)][travis]
+# namenode_exporter [![Build Status](https://travis-ci.org/timonwong/namenode_exporter.svg)][travis]
 
-[![CircleCI](https://circleci.com/gh/fahlke/namenode_exporter/tree/master.svg?style=shield)][circleci]
-[![Docker Repository on Quay](https://quay.io/repository/fahlke/namenode-exporter/status)][quay]
-[![Docker Pulls](https://img.shields.io/docker/pulls/fahlke/namenode-exporter.svg?maxAge=604800)][hub]
-[![Go Report Card](https://goreportcard.com/badge/github.com/fahlke/namenode_exporter)][goreportcard]
+[![CircleCI](https://circleci.com/gh/timonwong/namenode_exporter/tree/master.svg?style=shield)][circleci]
+[![Docker Repository on Quay](https://quay.io/repository/timonwong/namenode-exporter/status)][quay]
+[![Docker Pulls](https://img.shields.io/docker/pulls/timonwong/namenode-exporter.svg?maxAge=604800)][hub]
+[![Go Report Card](https://goreportcard.com/badge/github.com/timonwong/namenode_exporter)](https://goreportcard.com/report/github.com/timonwong/namenode_exporter)
+
+**NOTE**: This is a fork of https://github.com/fahlke/namenode_exporter, in addition to the original repo, this repo provides:
+
+* Pre-built binaries
+* Docker images
 
 Prometheus exporter for hardware and OS metrics exposed by JXM, written in Go.
 
@@ -49,11 +54,15 @@ TODO(fahlke): Add some useful PromQL queries to showcase the namenode_exporter
 
 ## Using Docker
 
-TODO(fahlke): Describe docker usage
+You can deploy this exporter using the Docker image from following registry:
 
-[travis]: https://travis-ci.org/fahlke/namenode_exporter
-[circleci]: https://circleci.com/gh/fahlke/namenode_exporter
-[quay]: https://quay.io/repository/fahlke/namenode-exporter
-[hub]: https://hub.docker.com/r/fahlke/namenode-exporter/
+* [DockerHub]\: [timonwong/namenode-exporter](https://registry.hub.docker.com/u/timonwong/namenode-exporter/)
+* [Quay.io]\: [timonwong/namenode-exporter](https://quay.io/repository/timonwong/namenode-exporter)
+
+[travis]: https://travis-ci.org/timonwong/namenode_exporter
+[circleci]: https://circleci.com/gh/timonwong/namenode_exporter
+[quay]: https://quay.io/repository/timonwong/namenode-exporter
+[hub]: https://hub.docker.com/r/timonwong/namenode-exporter/
 [goreportcard]: https://goreportcard.com/report/github.com/fahlke/namenode_exporter
-
+[DockerHub]: https://hub.docker.com
+[Quay.io]: https://quay.io

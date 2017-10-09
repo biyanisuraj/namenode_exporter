@@ -1,9 +1,9 @@
 machine:
   environment:
-    DOCKER_IMAGE_NAME: fahlke/namenode-exporter
-    QUAY_IMAGE_NAME: quay.io/fahlke/namenode-exporter
+    DOCKER_IMAGE_NAME: timonwong/namenode-exporter
+    QUAY_IMAGE_NAME: quay.io/timonwong/namenode-exporter
     DOCKER_TEST_IMAGE_NAME: quay.io/prometheus/golang-builder:1.8-base
-    REPO_PATH: github.com/fahlke/namenode_exporter
+    REPO_PATH: github.com/timonwong/namenode_exporter
   pre:
     - sudo curl -L -o /usr/bin/docker 'https://s3-external-1.amazonaws.com/circle-downloads/docker-1.9.1-circleci'
     - sudo chmod 0755 /usr/bin/docker
@@ -33,12 +33,11 @@ dependencies:
 test:
   override:
     - docker run --rm -t -v "$(pwd):/app" "${DOCKER_TEST_IMAGE_NAME}" -i "${REPO_PATH}" -T
-    - make test-docker
 
 deployment:
   hub_branch:
     branch: master
-    owner: fahlke
+    owner: timonwong
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
       - docker login -e $QUAY_EMAIL -u $QUAY_LOGIN -p $QUAY_PASSWORD quay.io
@@ -46,10 +45,9 @@ deployment:
       - docker push $QUAY_IMAGE_NAME
   hub_tag:
     tag: /^v[0-9]+(\.[0-9]+){2}(-.+|[^-.]*)$/
-    owner: fahlke
+    owner: timonwong
     commands:
       - promu crossbuild tarballs
-      - promu checksum .tarballs
       - promu release .tarballs
       - mkdir $CIRCLE_ARTIFACTS/releases/ && cp -a .tarballs/* $CIRCLE_ARTIFACTS/releases/
       - docker login -e $DOCKER_EMAIL -u $DOCKER_LOGIN -p $DOCKER_PASSWORD

@@ -37,6 +37,7 @@ type Exporter struct {
 	// namenode server health metrics
 	up            *prometheus.Desc // DONE!!! gauge -> validated by connecting the the JMX endpoint
 	uptime        *prometheus.Desc // DONE!!! gauge -> "java.lang:type=Runtime" -> Uptime
+	state         *prometheus.Desc // DONE!!! gauge -> "Hadoop:service=NameNode,name=NameNodeStatus" -> State -> string
 	fsOperational *prometheus.Desc // DONE!!! gauge -> "Hadoop:service=NameNode,name=FSNamesystemState" -> FSState -> string
 	safemodeOn    *prometheus.Desc // DONE!!! gauge -> "Hadoop:service=NameNode,name=NameNodeInfo" -> Safemode
 	dataNodesLive *prometheus.Desc // DONE!!! gauge -> "Hadoop:service=NameNode,name=FSNamesystemState" -> NumLiveDataNodes -> int
@@ -97,6 +98,12 @@ func NewExporter(url string, timeout time.Duration) *Exporter {
 		uptime: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "uptime_seconds"),
 			"Number of seconds since the namenode started.",
+			nil,
+			nil,
+		),
+		state: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "state"),
+			"Indicate namenode state (0 - standby, 1 - active).",
 			nil,
 			nil,
 		),
@@ -331,6 +338,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	// namenode server health metrics
 	ch <- e.up
 	ch <- e.uptime
+	ch <- e.state
 	ch <- e.fsOperational
 	ch <- e.safemodeOn
 	ch <- e.dataNodesLive
@@ -424,6 +432,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		switch nameDataMap["name"] {
 		case "java.lang:type=Runtime":
 			ch <- prometheus.MustNewConstMetric(e.uptime, prometheus.GaugeValue, nameDataMap["Uptime"].(float64))
+		case "Hadoop:service=NameNode,name=NameNodeStatus":
+			ch <- mustNewConstBoolMetric(e.state, prometheus.GaugeValue, nameDataMap["State"] == "active")
 		case "Hadoop:service=NameNode,name=FSNamesystem":
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksTotal, prometheus.GaugeValue, nameDataMap["BlocksTotal"].(float64))
 			ch <- prometheus.MustNewConstMetric(e.dfsBlocksUnderReplicated, prometheus.GaugeValue, nameDataMap["UnderReplicatedBlocks"].(float64))
